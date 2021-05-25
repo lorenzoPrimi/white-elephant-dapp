@@ -1,5 +1,5 @@
-pragma solidity >=0.6.0 <0.9.0;
 //SPDX-License-Identifier: MIT
+pragma solidity >=0.6.0 <0.9.0;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -67,7 +67,11 @@ contract YourContract is Ownable {
     }
 
     // Private scope if only intend to use in isParticipating modifier.
-    function participantExists(address participant) public view returns (bool) {
+    function participantExists(address participant)
+        private
+        view
+        returns (bool)
+    {
         for (uint256 i = 0; i < _participants.length; ++i) {
             if (_participants[i] == participant) {
                 return true;
@@ -126,12 +130,12 @@ contract YourContract is Ownable {
         giveGift();
     }
 
-    function joinGame() public canJoinGame spotsAvailable {
+    function joinGame() private canJoinGame spotsAvailable {
         _participants.push(msg.sender);
     }
 
     //TODO add check the user has not already gifted
-    function giveGift() public isParticipating {
+    function giveGift() private isParticipating {
         //TODO check gift value and add gift in array
         //getPrice()
     }
