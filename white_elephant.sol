@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 
-contract YourContract is Ownable {
+contract WhiteElephant is Ownable {
     // Variable packing to optimsie gas costs.
     bool public _privateGame;
     uint8 public _maxParticipants;
@@ -14,7 +14,14 @@ contract YourContract is Ownable {
     uint256 public _minGiftValue;
     uint256 public _maxGiftValue;
     address[] public _participants;
+    Gift[] public _gifts;
+    mapping(address => bool) _gifted;
     mapping(address => uint32) _order;
+
+    struct Gift {
+        address tokenAdress;
+        uint256 amount;
+    }
 
     constructor(
         uint256 minGiftValue,
@@ -51,11 +58,6 @@ contract YourContract is Ownable {
         uint256 _value
     );
 
-    modifier isParticipating() {
-        require(participantExists(msg.sender), "This is a private game");
-        _;
-    }
-
     modifier spotsAvailable() {
         require(_participants.length < _maxParticipants, "The game is full");
         _;
@@ -63,6 +65,11 @@ contract YourContract is Ownable {
 
     modifier canJoinGame() {
         require(_privateGame == false, "This is a private game");
+        _;
+    }
+
+    modifier hasNotGifted() {
+        require(_gifted[msg.sender] == false, "You have already gifted");
         _;
     }
 
@@ -80,24 +87,50 @@ contract YourContract is Ownable {
         return false;
     }
 
+    function joinGame() private canJoinGame spotsAvailable {
+        require(!participantExists(msg.sender), "You are already participating");
+            _participants.push(msg.sender);
+    }
+
+    function addParticipants(address[] memory participants) public onlyOwner {
+        require(
+            participants.length + _participants.length <= _maxParticipants,
+            "Too many participants added"
+        );
+        for (uint256 i = 0; i < participants.length; ++i) {
+            if (_participants.length < _maxParticipants) {
+                _participants.push(participants[i]);
+                console.log("adding participant ", participants[i]);
+            }
+        }
+    }
+
     function approveSpendToken(address tokenAdress, uint256 _amount)
         public
         returns (bool)
     {
-        //address tokenAdress = 0x3F78e5eff771Aed5FFC5B38223c84ea1774077d4;
         ERC20interface = ERC20(tokenAdress);
+        emit Approval(msg.sender, address(this), _amount);
         return ERC20interface.approve(address(this), _amount); // We give permission to this contract to spend the sender tokens
-        //emit Approval(msg.sender, address(this), _amount);
     }
 
     function depositTokens(address tokenAdress, uint256 _amount)
         external
         payable
+        hasNotGifted
     {
         ERC20interface = ERC20(tokenAdress);
+        //TODO check the price of the gift getPrice() or don't do the transfer
         address from = msg.sender;
         address to = address(this);
         ERC20interface.transferFrom(from, to, _amount);
+        _gifts.push(Gift({
+            tokenAdress: tokenAdress,
+            amount: _amount
+        }));
+        _gifted[from] = true;
+        checkStartGame();
+        emit Transfer(msg.sender, to, _amount);
     }
 
     //TODO pass as argument the token name / address
@@ -114,7 +147,7 @@ contract YourContract is Ownable {
         return price;
     }
 
-    /*  
+    /*
     //TODO for later when giving gifts
     function transferBack (address payable _to) public payable  {
         _to = msg.sender;
@@ -123,34 +156,29 @@ contract YourContract is Ownable {
     }
 */
 
-    //TODO add check the user has not already joined
-    //Maybe remove this function?
-    function joinGameWithGift() public canJoinGame spotsAvailable {
-        joinGame();
-        giveGift();
-    }
-
-    function joinGame() private canJoinGame spotsAvailable {
-        _participants.push(msg.sender);
-    }
-
-    //TODO add check the user has not already gifted
-    function giveGift() private isParticipating {
-        //TODO check gift value and add gift in array
-        //getPrice()
-    }
-
-    function addParticipants(address[] memory participants) public onlyOwner {
-        require(
-            participants.length + _participants.length <= _maxParticipants,
-            "Too many participants added"
-        );
-        for (uint256 i = 0; i < participants.length; ++i) {
-            if (_participants.length < _maxParticipants) {
-                _participants.push(participants[i]);
-                console.log("adding participant ", participants[i]);
-            }
+    function checkStartGame() private {
+        if (_participants.length == _maxParticipants &&
+        _participants.length == _gifts.length) {
+            //in this case we can start the game, everybody has gifted and we can distribute gifts back
         }
+    }
+
+    /* ---------------------------
+     * These two functions will be useful when deploying the full game
+     * ---------------------------
+     */
+    function wrapGifts() private onlyOwner {
+        require(_participants.length == _gifts.length, "Not everybody has gifted");
+        //TODO-FUTURE wrap gift. maybe not needed in version 1
+    }
+
+    function startGame() public onlyOwner returns (address[] memory) {
+        require(
+            _participants.length == _maxParticipants,
+            "The game is not full"
+        );
+        shuffleParticipants();
+        return _participants;
     }
 
     //From SE https://ethereum.stackexchange.com/questions/74775/shuffle-array-of-integers-in-solidity
@@ -164,20 +192,5 @@ contract YourContract is Ownable {
             _participants[n] = _participants[i];
             _participants[i] = temp;
         }
-    }
-
-    function wrapGifts() private onlyOwner {
-        //TODO check gifts = participants
-        //TODO-FUTURE wrap gift. maybe not needed in version 1
-    }
-
-    function startGame() public onlyOwner returns (address[] memory) {
-        require(
-            _participants.length == _maxParticipants,
-            "The game is not full"
-        );
-        shuffleParticipants();
-        wrapGifts();
-        return _participants;
     }
 }
