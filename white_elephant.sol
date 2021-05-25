@@ -7,11 +7,12 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 
 contract YourContract is Ownable {
-    ERC20 private ERC20interface;
+    // Variable packing to optimsie gas costs.
     bool public _privateGame;
+    uint8 public _maxParticipants;
+    ERC20 private ERC20interface;
     uint256 public _minGiftValue;
     uint256 public _maxGiftValue;
-    uint8 public _maxParticipants;
     address[] public _participants;
     mapping(address => uint32) _order;
 
@@ -42,6 +43,14 @@ contract YourContract is Ownable {
         uint256 timestamp
     );
 
+    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
+    event Approval(
+        address indexed _owner,
+        address indexed _spender,
+        uint256 _value
+    );
+
     modifier isParticipating() {
         require(participantExists(msg.sender), "This is a private game");
         _;
@@ -57,6 +66,7 @@ contract YourContract is Ownable {
         _;
     }
 
+    // Private scope if only intend to use in isParticipating modifier.
     function participantExists(address participant) public view returns (bool) {
         for (uint256 i = 0; i < _participants.length; ++i) {
             if (_participants[i] == participant) {
@@ -65,13 +75,6 @@ contract YourContract is Ownable {
         }
         return false;
     }
-
-    event Transfer(address indexed _from, address indexed _to, uint256 _value);
-    event Approval(
-        address indexed _owner,
-        address indexed _spender,
-        uint256 _value
-    );
 
     function approveSpendToken(address tokenAdress, uint256 _amount)
         public
