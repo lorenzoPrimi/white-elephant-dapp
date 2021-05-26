@@ -19,7 +19,7 @@ contract WhiteElephant is Ownable {
     mapping(address => uint32) _order;
 
     struct Gift {
-        address tokenAdress;
+        address tokenAddress;
         uint256 amount;
     }
 
@@ -114,12 +114,12 @@ contract WhiteElephant is Ownable {
         return ERC20interface.approve(address(this), _amount); // We give permission to this contract to spend the sender tokens
     }
 
-    function depositTokens(address tokenAdress, uint256 _amount)
+    function depositTokens(address tokenAddress, uint256 _amount)
         external
         payable
         hasNotGifted
     {
-        ERC20interface = ERC20(tokenAdress);
+        ERC20interface = ERC20(tokenAddress);
         //This won't work without the price feeds implemented
         int256 price = getPrice();
         if (_minGiftValue > 0){
@@ -138,7 +138,7 @@ contract WhiteElephant is Ownable {
         address to = address(this);
         ERC20interface.transferFrom(from, to, _amount);
         _gifts.push(Gift({
-            tokenAdress: tokenAdress,
+            tokenAddress: tokenAddress,
             amount: _amount
         }));
         _gifted[from] = true;
@@ -165,19 +165,21 @@ contract WhiteElephant is Ownable {
         return price;
     }
 
-    /*
-    //TODO for later when giving gifts
-    function transferBack (address payable _to) public payable  {
-        _to = msg.sender;
+    function transfer (address tokenAddress, address payable _to, uint256 _amount) public payable  {
+        ERC20interface = ERC20(tokenAddress);
         uint balance = ERC20interface.balanceOf(address(this)); // the balance of this smart contract
+       require(
+            balance >= _amount,
+            "Trying to transfer more than the smart contract balance"
+        );
         ERC20interface.transferFrom(address(this), _to, balance);
     }
-*/
 
     function checkStartGame() private {
         if (_participants.length == _maxParticipants &&
         _participants.length == _gifts.length) {
             //in this case we can start the game, everybody has gifted and we can distribute gifts back
+            startGame();
         }
     }
 
@@ -196,6 +198,11 @@ contract WhiteElephant is Ownable {
             "The game is not full"
         );
         shuffleParticipants();
+        //We shuffle the participants and give gifts in order
+        for (uint256 i = 0; i < _participants.length; i++) {
+            Gift memory gift = _gifts[i];
+            transfer(gift.tokenAddress, payable(_participants[i]), gift.amount);
+        }
         return _participants;
     }
 
