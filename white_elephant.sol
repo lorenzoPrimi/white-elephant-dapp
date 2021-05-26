@@ -11,8 +11,8 @@ contract WhiteElephant is Ownable {
     bool public _privateGame;
     uint8 public _maxParticipants;
     ERC20 private ERC20interface;
-    uint256 public _minGiftValue;
-    uint256 public _maxGiftValue;
+    int256 public _minGiftValue;
+    int256 public _maxGiftValue;
     address[] public _participants;
     Gift[] public _gifts;
     mapping(address => bool) _gifted;
@@ -24,8 +24,8 @@ contract WhiteElephant is Ownable {
     }
 
     constructor(
-        uint256 minGiftValue,
-        uint256 maxGiftValue,
+        int256 minGiftValue,
+        int256 maxGiftValue,
         bool privateGame,
         uint8 maxParticipants
     ) {
@@ -43,8 +43,8 @@ contract WhiteElephant is Ownable {
     }
 
     event GameCreated(
-        uint256 minGiftValue,
-        uint256 maxGiftValue,
+        int256 minGiftValue,
+        int256 maxGiftValue,
         bool privateGame,
         uint8 maxParticipants,
         uint256 timestamp
@@ -120,7 +120,20 @@ contract WhiteElephant is Ownable {
         hasNotGifted
     {
         ERC20interface = ERC20(tokenAdress);
-        //TODO check the price of the gift getPrice() or don't do the transfer
+        //This won't work without the price feeds implemented
+        int256 price = getPrice();
+        if (_minGiftValue > 0){
+            require(
+            price > _minGiftValue,
+            "Your gift value is too low"
+            );
+        }
+        if (_maxGiftValue > 0){
+            require(
+            price < _maxGiftValue,
+            "Your gift value is too high"
+            );
+        }
         address from = msg.sender;
         address to = address(this);
         ERC20interface.transferFrom(from, to, _amount);
@@ -133,6 +146,11 @@ contract WhiteElephant is Ownable {
         emit Transfer(msg.sender, to, _amount);
     }
 
+    /*
+     * Price feeds https://docs.chain.link/docs/reference-contracts/
+     * Ethereum https://docs.chain.link/docs/ethereum-addresses/
+     * Polygon https://docs.chain.link/docs/matic-addresses/
+    */
     //TODO pass as argument the token name / address
     function getPrice() private view returns (int256) {
         AggregatorV3Interface priceFeed =
