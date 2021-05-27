@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 
-contract WhiteElephant is Ownable {
+contract WhiteElephantGame is Ownable {
     // Variable packing to optimsie gas costs.
+    ERC20 private ERC20interface;
     bool public _privateGame;
     uint8 public _maxParticipants;
-    ERC20 private ERC20interface;
     int256 public _minGiftValue;
     int256 public _maxGiftValue;
     address[] public _participants;
@@ -104,7 +104,7 @@ contract WhiteElephant is Ownable {
             }
         }
     }
-
+    
     function approveSpendToken(address tokenAdress, uint256 _amount)
         public
         returns (bool)
@@ -176,17 +176,17 @@ contract WhiteElephant is Ownable {
     }
 
     function checkStartGame() private {
-        if (_participants.length == _maxParticipants &&
+        if (_participants.length == _maxParticipants && 
         _participants.length == _gifts.length) {
             //in this case we can start the game, everybody has gifted and we can distribute gifts back
             startGame();
         }
     }
-
+    
     /* ---------------------------
      * These two functions will be useful when deploying the full game
      * ---------------------------
-     */
+     */ 
     function wrapGifts() private onlyOwner {
         require(_participants.length == _gifts.length, "Not everybody has gifted");
         //TODO-FUTURE wrap gift. maybe not needed in version 1
@@ -205,7 +205,7 @@ contract WhiteElephant is Ownable {
         }
         return _participants;
     }
-
+    
     //From SE https://ethereum.stackexchange.com/questions/74775/shuffle-array-of-integers-in-solidity
     function shuffleParticipants() private onlyOwner {
         for (uint256 i = 0; i < _participants.length; i++) {
@@ -217,5 +217,31 @@ contract WhiteElephant is Ownable {
             _participants[n] = _participants[i];
             _participants[i] = temp;
         }
+    }
+}
+
+contract WhiteElephantFactory {
+    WhiteElephantGame[] public games;
+
+    function createGame(int256 minGiftValue, int256 maxGiftValue, bool privateGame, uint8 maxParticipants) public {
+        WhiteElephantGame game = new WhiteElephantGame(minGiftValue, maxGiftValue, privateGame, maxParticipants);
+        games.push(game);
+    }
+
+    function createGameAndSendEther(int256 minGiftValue, int256 maxGiftValue, bool privateGame, uint8 maxParticipants)
+        public
+        payable
+    {
+        WhiteElephantGame game = new WhiteElephantGame(minGiftValue, maxGiftValue, privateGame, maxParticipants);
+        games.push(game);
+    }
+
+    function getGame(uint _index)
+        public
+        view
+        returns (address owner, int256 minGiftValue, int256 maxGiftValue, bool privateGame, uint8 maxParticipants, uint balance)
+    {
+        WhiteElephantGame game = games[_index];
+        return (game.owner(), game._minGiftValue(), game._maxGiftValue(), game._privateGame(), game._maxParticipants(), address(game).balance);
     }
 }
