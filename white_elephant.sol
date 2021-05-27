@@ -9,6 +9,7 @@ import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 contract WhiteElephantGame is Ownable {
     // Variable packing to optimsie gas costs.
     ERC20 private ERC20interface;
+    WhiteElephantFactory _factory;
     bool public _privateGame;
     uint8 public _maxParticipants;
     int256 public _minGiftValue;
@@ -27,12 +28,14 @@ contract WhiteElephantGame is Ownable {
         int256 minGiftValue,
         int256 maxGiftValue,
         bool privateGame,
-        uint8 maxParticipants
+        uint8 maxParticipants,
+        WhiteElephantFactory factory
     ) {
         _minGiftValue = minGiftValue;
         _maxGiftValue = maxGiftValue;
         _privateGame = privateGame;
         _maxParticipants = maxParticipants;
+        _factory = factory;
         emit GameCreated(
             minGiftValue,
             maxGiftValue,
@@ -104,7 +107,7 @@ contract WhiteElephantGame is Ownable {
             }
         }
     }
-    
+
     function approveSpendToken(address tokenAdress, uint256 _amount)
         public
         returns (bool)
@@ -176,17 +179,22 @@ contract WhiteElephantGame is Ownable {
     }
 
     function checkStartGame() private {
-        if (_participants.length == _maxParticipants && 
+        if (_participants.length == _maxParticipants &&
         _participants.length == _gifts.length) {
             //in this case we can start the game, everybody has gifted and we can distribute gifts back
             startGame();
+            destroy();
         }
     }
-    
+
+    function destroy() public onlyOwner {
+        selfdestruct(payable(owner()));
+    }
+
     /* ---------------------------
      * These two functions will be useful when deploying the full game
      * ---------------------------
-     */ 
+     */
     function wrapGifts() private onlyOwner {
         require(_participants.length == _gifts.length, "Not everybody has gifted");
         //TODO-FUTURE wrap gift. maybe not needed in version 1
@@ -205,7 +213,7 @@ contract WhiteElephantGame is Ownable {
         }
         return _participants;
     }
-    
+
     //From SE https://ethereum.stackexchange.com/questions/74775/shuffle-array-of-integers-in-solidity
     function shuffleParticipants() private onlyOwner {
         for (uint256 i = 0; i < _participants.length; i++) {
@@ -223,17 +231,22 @@ contract WhiteElephantGame is Ownable {
 contract WhiteElephantFactory {
     WhiteElephantGame[] public games;
 
-    function createGame(int256 minGiftValue, int256 maxGiftValue, bool privateGame, uint8 maxParticipants) public {
-        WhiteElephantGame game = new WhiteElephantGame(minGiftValue, maxGiftValue, privateGame, maxParticipants);
+    function createGame(int256 minGiftValue, int256 maxGiftValue, bool privateGame, uint8 maxParticipants) public returns (WhiteElephantGame tokenAddress) {
+        WhiteElephantGame game = new WhiteElephantGame(minGiftValue, maxGiftValue, privateGame, maxParticipants, this);
+        game.transferOwnership(msg.sender);
         games.push(game);
+        return game;
     }
 
     function createGameAndSendEther(int256 minGiftValue, int256 maxGiftValue, bool privateGame, uint8 maxParticipants)
         public
         payable
+        returns (WhiteElephantGame tokenAddress)
     {
-        WhiteElephantGame game = new WhiteElephantGame(minGiftValue, maxGiftValue, privateGame, maxParticipants);
+        WhiteElephantGame game = new WhiteElephantGame(minGiftValue, maxGiftValue, privateGame, maxParticipants, this);
+        game.transferOwnership(msg.sender);
         games.push(game);
+        return game;
     }
 
     function getGame(uint _index)
