@@ -264,14 +264,13 @@ contract WhiteElephantGame is Ownable {
     }
 
     // Don't think start game should only be called by owner. That implies owner has to always be last gifter.
-    function startGame() public returns (address[] memory) {
+    function startGame() private {
         shuffleParticipants();
         //We shuffle the participants and give gifts in order
         for (uint256 i = 0; i < _participants.length; i++) {
             Gift memory gift = _gifts[i];
             transfer(gift.tokenAddress, payable(_participants[i]), gift.amount);
         }
-        return _participants;
     }
 
     //From SE https://ethereum.stackexchange.com/questions/74775/shuffle-array-of-integers-in-solidity
